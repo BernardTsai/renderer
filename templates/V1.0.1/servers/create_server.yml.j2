@@ -1,0 +1,106 @@
+{% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %}
+>> {{component.name}}/create.yml
+#!/usr/bin/env ansible-playbook
+---
+- name: Create server {{component.name}}
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ '{{ansible_playbook_python}}' }}"
+  vars_files:
+    - ../../environment.yml
+  environment: "{{ '{{env_vars}}' }}"
+  tasks:
+  - name: Set index I/II
+    set_fact:
+      idx: "{{ '{{' }} nr | default ('') {{ '}}' }}"
+
+  - name: Set index II/II
+    set_fact:
+      index: "{{ '{{' }} (idx == '') | ternary( '', '-' + idx) {{ '}}' }}"
+
+{% for interface in component.interfaces %}
+  # ----- {{interface.network}} port for {{component.name}} -----
+  - name: Create {{interface.network}} port for {{component.name}}
+    os_port:
+      state:          present
+      name:           "{{component.name}}{{ '{{ index }}' }}_{{interface.network}}"
+      network:        "{{interface.network}}"
+      validate_certs: no
+      security_groups:
+      - "{{component.name}}_{{interface.network}}"
+{% if interface.attributes|allowed|length > 0 %}
+      allowed_address_pairs:
+{% for allowed in interface.attributes|allowed %}
+      - ip_address: {{allowed}}
+{% endfor %}{% endif %}
+{% if interface.attributes|fixed|length > 0 %}
+      fixed_ips:
+{% for fixed in interface.attributes|fixed %}
+      - ip_address: {{fixed}}
+{% endfor %}{% endif %}
+
+{% endfor %}
+
+  # ----- {{component.name}} virtual machine -----
+  - name: Create virtual machine for {{component.name}} server
+    os_server:
+      state:          present
+      name:           {{component.name}}{{ '{{ index }}' }}
+      flavor:         "{{component.flavor}}"
+      image:          "{{component.image}}"
+      key_name:       admin_key
+      config_drive:   yes
+      auto_ip:        no
+      timeout:        600
+      validate_certs: no
+      nics:
+{% for interface in component.interfaces %}
+        - port-name: {{component.name}}{{ '{{ index }}' }}_{{interface.network}}
+{% endfor %}
+      meta:
+       hostname: {{component.name}}{{ '{{ index }}' }}
+{% if component.userdata != "" %}
+      userdata: |
+        {{ component.userdata | indent(8) | safe }}
+{% endif %}
+
+{% if component.name == "jumphost" %}{% if tenant.jumphost != "" %}
+  # ----- floating IP for jumphost -----
+  - name: Determine jumphost_oam port information
+    os_port_facts:
+      port:           "jumphost_oam"
+      validate_certs: no
+    register: jumphost_oam_facts
+
+  - name: Assign floating IP to jumphost
+    os_floating_ip:
+      state:               present
+      server:              jumphost
+      floating_ip_address: "{{tenant.jumphost}}"
+      fixed_address:       "{{ '{{' }} jumphost_oam_facts.ansible_facts.openstack_ports[0].fixed_ips[0].ip_address {{ '}}' }}"
+      validate_certs:      no
+
+{% endif %}{% endif %}
+
+{% for volume in component.volumes %}
+  # ----- {{volume.name}} volume for {{component.name}} -----
+  - name: Create {{volume.name}} volume for {{component.name}}
+    os_volume:
+      state:          present
+      name:           "{{component.name}}{{ '{{ index }}' }}_{{volume.name}}"
+      size:           {{volume.size}}
+      display_name:   "{volume.name}} volume for {{component.name}}"
+      validate_certs: no
+
+  - name: Attach volume {{volume.name}} to {{component.name}}
+    os_server_volume:
+      state:          present
+      server:         "{{component.name}}{{ '{{ index }}' }}"
+      volume:         "{{component.name}}{{ '{{ index }}' }}_{{volume.name}}"
+      validate_certs: no
+
+{% endfor %}
+
+{% endif %}{% endif %}{% endfor %}

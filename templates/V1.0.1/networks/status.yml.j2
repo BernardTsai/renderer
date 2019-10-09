@@ -1,0 +1,43 @@
+#!/usr/bin/env ansible-playbook
+---
+- name: Create network inventory of the tenant
+  hosts:        localhost
+  connection:   local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ '{{ansible_playbook_python}}' }}"
+  vars_files:
+    - ../environment.yml
+  environment: "{{ '{{env_vars}}' }}"
+  tasks:
+    - name: Define networks
+      set_fact:
+        network_names:
+{% for network in networks %}
+          - {{network.name}}
+{% endfor %}
+
+    - name: Collect network information
+      os_networks_facts:
+         validate_certs: no
+      register: networks
+      ignore_errors: yes
+
+    - name: Collect subnet information
+      os_subnets_facts:
+         validate_certs: no
+      register: subnets
+      ignore_errors: yes
+
+    - name: Create output directory
+      file:
+        path:  ../output
+        state: directory
+      delegate_to:  localhost
+
+    - name: Create report 'networks.yml'
+      template:
+        src:  ../templates/networks.tmpl
+        dest: ../output/networks.yml
+      delegate_to:  localhost
+      changed_when: false

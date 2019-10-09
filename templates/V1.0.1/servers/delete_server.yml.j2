@@ -1,0 +1,58 @@
+{% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %}
+>> {{component.name}}/delete.yml
+#!/usr/bin/env ansible-playbook
+---
+- name: Delete server {{component.name}}
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ '{{ansible_playbook_python}}' }}"
+  vars_files:
+    - ../../environment.yml
+  environment: "{{ '{{env_vars}}' }}"
+  tasks:
+  - name: Set index I/II
+    set_fact:
+      idx: "{{ '{{' }} nr | default ('') {{ '}}' }}"
+
+  - name: Set index II/II
+    set_fact:
+      index: "{{ '{{' }} (idx == '') | ternary( '', '-' + idx) {{ '}}' }}"
+
+{% for interface in component.interfaces %}
+  # ----- {{interface.network}} port for {{component.name}} -----
+  - name: Delete {{interface.network}} port for {{component.name}}
+    os_port:
+      state:          absent
+      name:           "{{component.name}}{{ '{{ index }}' }}_{{interface.network}}"
+      network:        "{{interface.network}}"
+      validate_certs: no
+
+{% endfor %}
+
+{% for volume in component.volumes %}
+  # ----- {{volume.name}} volume for {{component.name}} -----
+  - name: Detach volume {{volume.name}} to {{component.name}}
+    os_server_volume:
+      state:          absent
+      server:         "{{component.name}}{{ '{{ index }}' }}"
+      volume:         "{{component.name}}{{ '{{ index }}' }}_{{volume.name}}"
+      validate_certs: no
+
+  - name: Create {{volume.name}} volume for {{component.name}}
+    os_volume:
+      state:          absent
+      name:           "{{component.name}}{{ '{{ index }}' }}_{{volume.name}}"
+      validate_certs: no
+
+{% endfor %}
+
+  # ----- {{component.name}} virtual machine -----
+  - name: Delete virtual machine for {{component.name}} server
+    os_server:
+      state:          absent
+      name:           {{component.name}}{{ '{{ index }}' }}
+      validate_certs: no
+
+{% endif %}{% endif %}{% endfor %}

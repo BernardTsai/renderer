@@ -1,0 +1,70 @@
+{% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %}
+>> {{component.name}}/define_security.yml
+#!/usr/bin/env ansible-playbook
+---
+- name: Create security groups for ports of server {{component.name}}
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ '{{ansible_playbook_python}}' }}"
+  vars_files:
+    - ../../environment.yml
+  environment: "{{ '{{env_vars}}' }}"
+  tasks:
+
+{% for interface in component.interfaces %}
+  # ----- security group for {{component.name}} interface {{interface.network}} -----
+  - name: Create {{component.name}}_{{interface.network}} security group
+    os_security_group:
+      state:          present
+      name:           {{component.name}}_{{interface.network}}
+      description:    Security group for the {{component.name}} {{interface.network}} interface.
+      validate_certs: no
+    register: secgroup
+
+  # ----- reset all ingress security rules for {{component.name}} interface {{interface.network}} -----
+  - name: Delete all ingress {{component.name}}_{{interface.network}} security group rules
+    os_security_group_rule:
+      state:            absent
+      security_group:   {{component.name}}_{{interface.network}}
+      protocol:         "{{ '{{item.protocol}}' }}"
+      port_range_min:   "{{ '{{item.port_range_min}}' }}"
+      port_range_max:   "{{ '{{item.port_range_max}}' }}"
+      remote_ip_prefix: "{{ '{{item.remote_ip_prefix}}' }}"
+      direction:        ingress
+      validate_certs:   no
+    loop: "{{ '{{secgroup.secgroup.security_group_rules}}' }}"
+    when: item.direction == "ingress"
+
+  # ----- security group rules for {{component.name}} interface {{interface.network}} -----
+  - name: Create {{component.name}}_{{interface.network}} security group rules
+    os_security_group_rule:
+      state:            present
+      security_group:   {{component.name}}_{{interface.network}}
+      protocol:         "{{ '{{item.protocol}}' }}"
+      port_range_min:   "{{ '{{item.port_range_min}}' }}"
+      port_range_max:   "{{ '{{item.port_range_max}}' }}"
+      remote_ip_prefix: "{{ '{{item.remote_ip_prefix}}' }}"
+      direction:        ingress
+      validate_certs:   no
+      ignore_errors:    yes
+    loop:
+    - {protocol: icmp, port_range_min: 0, port_range_max: 255, remote_ip_prefix: 0.0.0.0/0}
+{% for service in component.services %}{% if interface.network == service.network %}
+{% for network in networks %}{% if interface.network == network.name %}
+    - {protocol: {{service.protocol}}, port_range_min: {{service.range | portmin }}, port_range_max: {{service.range | portmax }}, remote_ip_prefix: {{network.ipv4}} }
+{% endif %}{% endfor %}
+{% endif %}{% endfor %}
+{% for service in component.services %}{% if interface.network == service.network %}
+{% for component2 in components %}{% if component2.placement != 'ROUTER' %}
+{% for dependency in component2.dependencies %}{% if dependency.component == component.name %}{% if dependency.service == service.name %}
+{% for network2 in networks %}{% if dependency.network == network2.name %}
+    - {protocol: {{service.protocol}}, port_range_min: {{service.range | portmin }}, port_range_max: {{service.range | portmax }}, remote_ip_prefix: {{network2.ipv4}} }
+{% endif %}{% endfor %}
+{% endif %}{% endif %}{% endfor %}
+{% endif %}{% endfor %}
+{% endif %}{% endfor %}
+
+{% endfor %}
+{% endif %}{% endif %}{% endfor %}

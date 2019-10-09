@@ -1,0 +1,26 @@
+{% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %}
+>> {{component.name}}/undefine_security.yml
+#!/usr/bin/env ansible-playbook
+---
+- name: Delete security groups for ports of server {{component.name}}
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ '{{ansible_playbook_python}}' }}"
+  vars_files:
+    - ../../environment.yml
+  environment: "{{ '{{env_vars}}' }}"
+  tasks:
+
+{% for interface in component.interfaces %}
+  # ----- security group for {{component.name}} interface {{interface.network}} -----
+  - name: Delete {{component.name}}_{{interface.network}} security group
+    os_security_group:
+      state:          absent
+      name:           {{component.name}}_{{interface.network}}
+      description:    Security group for the {{component.name}} {{interface.network}} interface.
+      validate_certs: no
+
+{% endfor %}
+{% endif %}{% endif %}{% endfor %}

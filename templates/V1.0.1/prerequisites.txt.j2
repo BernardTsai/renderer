@@ -1,0 +1,48 @@
+
+{% set ns = namespace(instances=0, volumes=0, vcpu=0, ram=0, disk=0,) %}
+{% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %}
+{% set ns.instances = ns.instances + 1 %}
+{% for flavor in flavors %}{% if component.flavor == flavor.name %}
+{% set ns.vcpu = ns.vcpu + flavor.vcpu %}
+{% set ns.ram  = ns.ram  + flavor.ram * 1024 %}
+{% set ns.disk = ns.disk + flavor.disk %}
+{% endif %}{% endfor %}
+{% for volume in component.volumes %}
+{% set ns.volumes = ns.volumes + 1 %}
+{% set ns.disk    = ns.disk  + volume.size * 1024 %}
+{% endfor %}
+{% endif %}{% endif %}{% endfor %}
+Prequisites:
+============
+
+Tenant: {{tenant.name}}
+
+Name of ssh-key: admin_key
+
+Quota:
+------
+
+* Virtual machines:     {{ns.instances}}
+* Volumes:              {{ns.volumes}}
+* Virtual CPUs:         {{ns.vcpu}}
+* Random Access Memory: {{ns.ram}} [MB]
+* Disk Storage:         {{ns.disk}} [MB]
+
+Flavors:
+--------
+{% for flavor in flavors %}
+{% set found = false %}
+{% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %}
+{% if found == false %}{% if component.flavor == flavor.name %}
+* {{(flavor.name + "                    ") | truncate(20, true, "") }}: {{flavor.vcpu}} vCPUs / {{flavor.ram}} [MB ram] / {{flavor.disk}} [GB disk]
+{% set found = true %}
+{% endif %}{% endif %}
+{% endif %}{% endif %}{% endfor %}
+{% endfor %}
+
+Images:
+-------
+{% for image, components in components | groupby("image") %}
+* {{(image + "                               ") | truncate(35, true, "") }}: {% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %} {{ component.name }}{% endif %}{% endif %}{% endfor %}
+
+{% endfor %}

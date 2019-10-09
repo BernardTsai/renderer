@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+{% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %}
+{% if component.max == 1 %}
+$SCRIPTPATH/{{component.name}}/delete.yml &
+{% else %}
+{% for index in range(component.max) %}
+$SCRIPTPATH/{{component.name}}/delete.yml --extra-vars "nr={{index+1}}" &
+{% endfor %}
+{% endif %}
+{% endif %}{% endif %}{% endfor %}
+wait

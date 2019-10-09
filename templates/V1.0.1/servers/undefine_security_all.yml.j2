@@ -1,0 +1,6 @@
+#!/usr/bin/env ansible-playbook
+---
+{% for component in components %}{% if component.placement != 'OTHER' %}{% if component.placement != 'ROUTER' %}
+- name: Create {{component.name}}
+  import_playbook: {{component.name}}/undefine_security.yml
+{% endif %}{% endif %}{% endfor %}
