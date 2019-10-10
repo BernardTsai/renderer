@@ -10,8 +10,4 @@ setup(
     author_email = 'bernard@tsai.eu',
     url          = 'https://github.com/BernardTsai/renderer',
     py_modules   = ['render'],
-    install_requires=[
-        "Jinja2",
-        "PyYAML",
-    ],
 )
