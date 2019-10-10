@@ -244,13 +244,13 @@ def saveView(view, path):
         if match:
             # write the existing block
             if block != '':
-                write_block(path, file_name, block)
+                write_block(str(path), str(file_name), block)
 
                 # reset block
                 block = ''
 
             # set new file name
-            file_name = match[1]
+            file_name = match.group(1)
         else:
             if block == '':
                 block = line
@@ -258,7 +258,7 @@ def saveView(view, path):
                 block += '\n' + line
 
     # write last block
-    write_block(path, file_name, block)
+    write_block(str(path), str(file_name), block)
 
 
 # --------------------------------------------------------------------------
@@ -270,10 +270,8 @@ def write_block(path, file_name, block):
         if file_name == '':
             file_path = os.path.join(path)
         else:
-            file_path = pathlib.Path(path).parent
+            file_path = str(pathlib.Path(path).parent)
             file_path = os.path.join(file_path, file_name)
-
-        print(file_path)
 
         # check if the file_path does not point to a directory
         if os.path.isdir(file_path):
@@ -343,6 +341,7 @@ def main():
             saveView(view, output_path)
 
     except Exception as exc:
+        traceback.print_exc()
         logging.error('Unknown error: {}'.format(exc))
         return 1
 
