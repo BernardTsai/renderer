@@ -68,7 +68,7 @@ def loadModel():
 # loadTemplate: loads template from a file and returns a string
 # ------------------------------------------------------------------------------
 def loadTemplate(filename):
-    with codecs.open(filename, 'r', 'utf-8') as template_file:
+    with codecs.open(str(filename), 'r', 'utf-8') as template_file:
         template = template_file.read()
 
     return template
